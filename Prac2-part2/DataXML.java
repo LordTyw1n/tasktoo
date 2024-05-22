@@ -24,40 +24,58 @@ public class ReadXMLFile {
             selectedFields.add(field.toLowerCase());
         }
 
+        // Validate the input fields
+        Set<String> validFields = Set.of("name", "postalzip", "region", "country", "address", "list");
+        for (String field : selectedFields) {
+            if (!validFields.contains(field)) {
+                System.out.println("Invalid field: " + field);
+                System.out.println("Valid fields are: name, postalZip, region, country, address, list");
+                return;
+            }
+        }
+
         try {
             File inputFile = new File("data.xml");
+            if (!inputFile.exists()) {
+                System.out.println("The file data.xml does not exist.");
+                return;
+            }
+            
             DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
             DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
             Document doc = dBuilder.parse(inputFile);
             doc.getDocumentElement().normalize();
 
             NodeList nList = doc.getElementsByTagName("record");
-            JSONArray recordsArray = new JSONArray();
+            if (nList.getLength() == 0) {
+                System.out.println("No records found in the XML file.");
+                return;
+            }
 
+            JSONArray recordsArray = new JSONArray();
             for (int temp = 0; temp < nList.getLength(); temp++) {
                 Node nNode = nList.item(temp);
-
                 if (nNode.getNodeType() == Node.ELEMENT_NODE) {
                     Element eElement = (Element) nNode;
                     JSONObject recordObject = new JSONObject();
 
                     if (selectedFields.contains("name")) {
-                        recordObject.put("name", eElement.getElementsByTagName("name").item(0).getTextContent());
+                        recordObject.put("name", getElementTextContent(eElement, "name"));
                     }
                     if (selectedFields.contains("postalzip")) {
-                        recordObject.put("postalZip", eElement.getElementsByTagName("postalZip").item(0).getTextContent());
+                        recordObject.put("postalZip", getElementTextContent(eElement, "postalZip"));
                     }
                     if (selectedFields.contains("region")) {
-                        recordObject.put("region", eElement.getElementsByTagName("region").item(0).getTextContent());
+                        recordObject.put("region", getElementTextContent(eElement, "region"));
                     }
                     if (selectedFields.contains("country")) {
-                        recordObject.put("country", eElement.getElementsByTagName("country").item(0).getTextContent());
+                        recordObject.put("country", getElementTextContent(eElement, "country"));
                     }
                     if (selectedFields.contains("address")) {
-                        recordObject.put("address", eElement.getElementsByTagName("address").item(0).getTextContent());
+                        recordObject.put("address", getElementTextContent(eElement, "address"));
                     }
                     if (selectedFields.contains("list")) {
-                        recordObject.put("list", eElement.getElementsByTagName("list").item(0).getTextContent());
+                        recordObject.put("list", getElementTextContent(eElement, "list"));
                     }
 
                     recordsArray.put(recordObject);
@@ -67,7 +85,17 @@ public class ReadXMLFile {
             // Output the JSON array
             System.out.println(recordsArray.toString(4)); // Pretty print with an indent of 4
         } catch (Exception e) {
+            System.out.println("An error occurred while processing the XML file.");
             e.printStackTrace();
+        }
+    }
+
+    private static String getElementTextContent(Element element, String tagName) {
+        NodeList nodeList = element.getElementsByTagName(tagName);
+        if (nodeList.getLength() > 0) {
+            return nodeList.item(0).getTextContent();
+        } else {
+            return "N/A"; // Or handle as appropriate for missing fields
         }
     }
 }
