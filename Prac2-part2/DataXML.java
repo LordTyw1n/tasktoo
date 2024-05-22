@@ -1,11 +1,11 @@
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.DocumentBuilder;
-import org.w3c.dom.Document;
-import org.w3c.dom.NodeList;
-import org.w3c.dom.Node;
-import org.w3c.dom.Element;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+import org.xml.sax.SAXParser;
+import org.xml.sax.SAXParserFactory;
 import org.json.JSONObject;
 import org.json.JSONArray;
+
 import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
@@ -40,62 +40,64 @@ public class ReadXMLFile {
                 System.out.println("The file data.xml does not exist.");
                 return;
             }
-            
-            DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-            Document doc = dBuilder.parse(inputFile);
-            doc.getDocumentElement().normalize();
 
-            NodeList nList = doc.getElementsByTagName("record");
-            if (nList.getLength() == 0) {
-                System.out.println("No records found in the XML file.");
-                return;
-            }
-
-            JSONArray recordsArray = new JSONArray();
-            for (int temp = 0; temp < nList.getLength(); temp++) {
-                Node nNode = nList.item(temp);
-                if (nNode.getNodeType() == Node.ELEMENT_NODE) {
-                    Element eElement = (Element) nNode;
-                    JSONObject recordObject = new JSONObject();
-
-                    if (selectedFields.contains("name")) {
-                        recordObject.put("name", getElementTextContent(eElement, "name"));
-                    }
-                    if (selectedFields.contains("postalzip")) {
-                        recordObject.put("postalZip", getElementTextContent(eElement, "postalZip"));
-                    }
-                    if (selectedFields.contains("region")) {
-                        recordObject.put("region", getElementTextContent(eElement, "region"));
-                    }
-                    if (selectedFields.contains("country")) {
-                        recordObject.put("country", getElementTextContent(eElement, "country"));
-                    }
-                    if (selectedFields.contains("address")) {
-                        recordObject.put("address", getElementTextContent(eElement, "address"));
-                    }
-                    if (selectedFields.contains("list")) {
-                        recordObject.put("list", getElementTextContent(eElement, "list"));
-                    }
-
-                    recordsArray.put(recordObject);
-                }
-            }
+            SAXParserFactory factory = SAXParserFactory.newInstance();
+            SAXParser saxParser = factory.newSAXParser();
+            UserSelectedFieldsHandler handler = new UserSelectedFieldsHandler(selectedFields);
+            saxParser.parse(inputFile, handler);
 
             // Output the JSON array
-            System.out.println(recordsArray.toString(4)); // Pretty print with an indent of 4
+            System.out.println(handler.getRecordsArray().toString(4)); // Pretty print with an indent of 4
         } catch (Exception e) {
             System.out.println("An error occurred while processing the XML file.");
             e.printStackTrace();
         }
     }
+}
 
-    private static String getElementTextContent(Element element, String tagName) {
-        NodeList nodeList = element.getElementsByTagName(tagName);
-        if (nodeList.getLength() > 0) {
-            return nodeList.item(0).getTextContent();
-        } else {
-            return "N/A"; // Or handle as appropriate for missing fields
+class UserSelectedFieldsHandler extends DefaultHandler {
+    private Set<String> selectedFields;
+    private JSONArray recordsArray = new JSONArray();
+    private JSONObject currentRecord;
+    private StringBuilder currentValue;
+    private boolean inRecord;
+
+    public UserSelectedFieldsHandler(Set<String> selectedFields) {
+        this.selectedFields = selectedFields;
+        this.currentValue = new StringBuilder();
+        this.inRecord = false;
+    }
+
+    public JSONArray getRecordsArray() {
+        return recordsArray;
+    }
+
+    @Override
+    public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
+        currentValue.setLength(0); // Clear the current value
+        if (qName.equalsIgnoreCase("record")) {
+            currentRecord = new JSONObject();
+            inRecord = true;
+        }
+    }
+
+    @Override
+    public void characters(char[] ch, int start, int length) throws SAXException {
+        currentValue.append(ch, start, length);
+    }
+
+    @Override
+    public void endElement(String uri, String localName, String qName) throws SAXException {
+        if (inRecord) {
+            String tagValue = currentValue.toString().trim();
+            String lowerQName = qName.toLowerCase();
+            if (selectedFields.contains(lowerQName)) {
+                currentRecord.put(lowerQName.equals("postalzip") ? "postalZip" : lowerQName, tagValue);
+            }
+            if (qName.equalsIgnoreCase("record")) {
+                recordsArray.put(currentRecord);
+                inRecord = false;
+            }
         }
     }
 }
